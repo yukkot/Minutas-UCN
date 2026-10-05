@@ -1,0 +1,13 @@
+# Dependencias y builds
+node_modules/
+dist/
+
+# Variables de entorno (se sube solo el ejemplo)
+.env
+.env.*
+!.env.example
+
+# Logs y sistema
+*.log
+.DS_Store
+Thumbs.db

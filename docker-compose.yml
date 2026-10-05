@@ -1,0 +1,51 @@
+# Levanta todo el sistema desde la raíz:
+#   docker compose up --build -d
+# App:       http://localhost:8080
+# API:       http://localhost:8080/api  (Nginx la reenvía al backend por la red interna)
+# Postgres:  localhost:5432  (usuario/clave/bd: minutas)
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: minutas-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: minutas
+      POSTGRES_PASSWORD: minutas
+      POSTGRES_DB: minutas
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U minutas -d minutas"]
+      interval: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    container_name: minutas-backend
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgres://minutas:minutas@db:5432/minutas
+      MAX_UPLOAD_MB: 10
+    # Sin "ports": el backend solo es accesible dentro de Docker (a través de Nginx).
+    # Así no choca con el puerto 3000 del modo desarrollo (npm run dev).
+    expose:
+      - "3000"
+    depends_on:
+      db:
+        condition: service_healthy   # espera a que Postgres acepte conexiones
+
+  frontend:
+    build: ./frontend
+    container_name: minutas-frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+volumes:
+  db_data:

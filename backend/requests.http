@@ -1,0 +1,26 @@
+# Peticiones de prueba (extensión REST Client de VS Code: clic en "Send Request")
+@api = http://localhost:3000/api
+
+### Salud
+GET {{api}}/health
+
+### Historial de importaciones
+GET {{api}}/importaciones
+
+### Ingredientes (con búsqueda opcional)
+GET {{api}}/ingredientes?q=arroz
+
+### Recetas
+GET {{api}}/recetas
+
+### Crear menú
+POST {{api}}/menus
+Content-Type: application/json
+
+{ "nombre": "Semana 1", "dias": 5 }
+
+### Guardar asignaciones del menú 1
+PUT {{api}}/menus/1
+Content-Type: application/json
+
+{ "items": [ { "dia": 0, "tiempo": "almuerzo", "receta_id": 1 } ] }
