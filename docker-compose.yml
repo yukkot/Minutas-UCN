@@ -1,49 +1,88 @@
-# Levanta todo el sistema desde la raíz:
-#   docker compose up --build -d
-# App:       http://localhost:8080
-# API:       http://localhost:8080/api  (Nginx la reenvía al backend por la red interna)
-# Postgres:  localhost:5432  (usuario/clave/bd: minutas)
+# Levanta todo el sistema desde la raíz del proyecto (Windows, macOS o Linux):
+#   1. Crear el .env (solo la primera vez en cada PC):
+#        Windows:      powershell -ExecutionPolicy Bypass -File scripts\configurar.ps1
+#        macOS/Linux:  sh scripts/configurar.sh
+#   2. docker compose up --build -d
+#
+# Más workers para procesar importaciones en paralelo:
+#   docker compose up -d --scale worker=3
+#
+# App:       http://localhost:8080          (FRONTEND_PORT en .env)
+# API:       http://localhost:8080/api      (Nginx la reenvía al backend por la red interna)
+# Postgres:  localhost:5432, solo desde este mismo PC (POSTGRES_PORT en .env)
+
+# Nombre fijo del proyecto: los contenedores, imágenes y el volumen de datos se llaman
+# igual sin importar el nombre de la carpeta donde se clone el repositorio.
+name: minutas-ucn
+
+# Todos los valores tienen un predeterminado, salvo la clave, que debe venir del .env.
+x-db-credenciales: &db-url
+  DATABASE_URL: postgres://${POSTGRES_USER:-minutas}:${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD. Crea el .env con scripts/configurar o copiando .env.example}@db:5432/${POSTGRES_DB:-minutas}
+
+x-backend-env: &backend-env
+  <<: *db-url
+  WORKER_INTERVALO_MS: 1000
+  WORKER_MAX_INTENTOS: 3
+  WORKER_TIMEOUT_MIN: 5
+  WORKER_TAMANO_LOTE: 500
 
 services:
   db:
     image: postgres:16-alpine
-    container_name: minutas-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: minutas
-      POSTGRES_PASSWORD: minutas
-      POSTGRES_DB: minutas
+      POSTGRES_USER: ${POSTGRES_USER:-minutas}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD en .env}
+      POSTGRES_DB: ${POSTGRES_DB:-minutas}
     ports:
-      - "5432:5432"
+      # 127.0.0.1: solo este PC puede conectarse (pgAdmin, npm run dev), no otros equipos de la red
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U minutas -d minutas"]
+      # $$ = variable del contenedor (no la reemplaza docker compose)
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       retries: 10
 
+  # API: aplica migraciones al arrancar, recibe los Excel y los deja en cola.
   backend:
     build: ./backend
-    container_name: minutas-backend
     restart: unless-stopped
     environment:
+      <<: *backend-env
       PORT: 3000
-      DATABASE_URL: postgres://minutas:minutas@db:5432/minutas
       MAX_UPLOAD_MB: 10
+      EJECUTAR_WORKER: "false"     # el procesamiento lo hace el servicio "worker"
     # Sin "ports": el backend solo es accesible dentro de Docker (a través de Nginx).
-    # Así no choca con el puerto 3000 del modo desarrollo (npm run dev).
     expose:
       - "3000"
     depends_on:
       db:
-        condition: service_healthy   # espera a que Postgres acepte conexiones
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 5s
+      retries: 20
+      start_period: 10s
+
+  # Procesa las importaciones en segundo plano. Se puede escalar con --scale worker=N.
+  worker:
+    build: ./backend
+    command: ["node", "src/worker.js"]
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+    depends_on:
+      backend:
+        condition: service_healthy   # espera a que el backend haya aplicado las migraciones
+    stop_grace_period: 60s           # tiempo para terminar el trabajo en curso al detenerse
 
   frontend:
     build: ./frontend
-    container_name: minutas-frontend
     restart: unless-stopped
     ports:
-      - "8080:80"
+      - "${FRONTEND_PORT:-8080}:80"
     depends_on:
       - backend
 

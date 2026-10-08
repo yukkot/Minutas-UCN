@@ -13,6 +13,13 @@ export function errorHandler(err, req, res, next) {
   if (err instanceof multer.MulterError) {
     return res.status(400).json({ error: `Error al subir el archivo: ${err.message}` });
   }
+  // Errores de PostgreSQL que son culpa de los datos enviados, no del servidor
+  if (err.code === '23505') {
+    return res.status(409).json({ error: 'Ya existe un registro con esos datos', details: err.detail });
+  }
+  if (err.code === '23503') {
+    return res.status(409).json({ error: 'El registro está relacionado con otro que no existe o que lo usa', details: err.detail });
+  }
   console.error(err);
   res.status(500).json({ error: 'Error interno del servidor' });
 }

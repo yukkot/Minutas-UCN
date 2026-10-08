@@ -1,5 +1,4 @@
-// Convierte un Excel en un arreglo de objetos JSON con claves normalizadas.
-// Ej: "Proteínas (g)" -> "proteinas_g"
+// Utilidades genéricas para leer archivos Excel con SheetJS.
 import * as XLSX from 'xlsx';
 
 export function normalizarClave(texto) {
@@ -14,13 +13,34 @@ function normalizarValor(valor) {
   if (typeof valor !== 'string') return valor ?? null;
   const t = valor.trim();
   if (t === '') return null;
-  // "12,5" -> 12.5  (TODO: definir formato de miles si el Excel los trae)
+  // "12,5" -> 12.5
   if (/^-?\d+([.,]\d+)?$/.test(t)) return Number(t.replace(',', '.'));
   return t;
 }
 
+export const leerLibro = (buffer) => XLSX.read(buffer, { type: 'buffer' });
+
+export const letraColumna = (indice) => XLSX.utils.encode_col(indice); // 0 -> "A"
+
+/**
+ * Devuelve la hoja como matriz de celdas, siempre desde A1 y conservando filas vacías,
+ * así matriz[i][j] corresponde a la fila i+1 y la columna j (0 = A) del Excel.
+ */
+export function hojaComoMatriz(libro, nombreHoja) {
+  const hoja = libro.Sheets[nombreHoja];
+  if (!hoja?.['!ref']) return [];
+  const rango = XLSX.utils.decode_range(hoja['!ref']);
+  rango.s.r = 0;
+  rango.s.c = 0;
+  return XLSX.utils.sheet_to_json(hoja, { header: 1, defval: null, blankrows: true, raw: true, range: rango });
+}
+
+/**
+ * Lectura genérica: primera hoja, fila 1 como encabezados y claves normalizadas.
+ * Ej: "Proteínas (g)" -> "proteinas_g"
+ */
 export function leerExcel(buffer) {
-  const libro = XLSX.read(buffer, { type: 'buffer' });
+  const libro = leerLibro(buffer);
   const hoja = libro.SheetNames[0];
   const crudas = XLSX.utils.sheet_to_json(libro.Sheets[hoja], { defval: null });
 

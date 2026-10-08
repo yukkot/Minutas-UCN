@@ -2,10 +2,13 @@
 node_modules/
 dist/
 
-# Variables de entorno (se sube solo el ejemplo)
+# Variables de entorno: solo se suben los ejemplos
 .env
 .env.*
 !.env.example
+
+# Datos reales (Excel de trabajo). Guárdalos aquí para que nunca se suban.
+datos/
 
 # Logs y sistema
 *.log

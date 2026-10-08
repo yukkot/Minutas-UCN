@@ -4,23 +4,64 @@
 ### Salud
 GET {{api}}/health
 
-### Historial de importaciones
-GET {{api}}/importaciones
+### ---------------------------------------------------------------- Listas
+GET {{api}}/listas?tipo=ingredientes
 
-### Ingredientes (con búsqueda opcional)
-GET {{api}}/ingredientes?q=arroz
+### Crear lista vacía
+POST {{api}}/listas
+Content-Type: application/json
+
+{ "nombre": "Tabla TCA 2018", "descripcion": "Alimentos de la tabla chilena 2018" }
+
+### Renombrar
+PATCH {{api}}/listas/1
+Content-Type: application/json
+
+{ "nombre": "Tabla TCA 2018 (revisada)" }
+
+### Eliminar lista y todos sus ingredientes
+DELETE {{api}}/listas/1
+
+### ---------------------------------------------------------------- Importaciones
+# Subir archivos con REST Client:
+POST {{api}}/importaciones
+Content-Type: multipart/form-data; boundary=limite
+
+--limite
+Content-Disposition: form-data; name="tipo"
+
+ingredientes
+--limite
+Content-Disposition: form-data; name="lista_nombre"
+
+Aceites
+--limite
+Content-Disposition: form-data; name="archivo"; filename="ingredientes.xlsx"
+Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+
+< ../docs/ejemplos/ingredientes.xlsx
+--limite--
+
+### Estado y avance de una importación
+GET {{api}}/importaciones/1
+
+### Historial (opcional: filtrar por lista)
+GET {{api}}/importaciones?lista_id=1&limite=20
+
+### Reintentar una importación fallida
+POST {{api}}/importaciones/1/reintentar
+
+### Definición de los formatos
+GET {{api}}/importaciones/formatos
+
+### ---------------------------------------------------------------- Inventario
+GET {{api}}/ingredientes?lista_id=1&q=aceite&pagina=1&por_pagina=50
 
 ### Recetas
 GET {{api}}/recetas
 
-### Crear menú
+### ---------------------------------------------------------------- Menús
 POST {{api}}/menus
 Content-Type: application/json
 
 { "nombre": "Semana 1", "dias": 5 }
-
-### Guardar asignaciones del menú 1
-PUT {{api}}/menus/1
-Content-Type: application/json
-
-{ "items": [ { "dia": 0, "tiempo": "almuerzo", "receta_id": 1 } ] }
